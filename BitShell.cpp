@@ -38,6 +38,16 @@ void slater(int n, int level, vector<int> inlevels)
     };
 };
 
+/*template <class T>
+void Print_Vec(vector<T> vec)
+{
+  std::cout << endl << endl;
+  for (int i = 0; i < int(vec.size()); ++i)
+    {
+      std::cout << vec[i] << endl;
+    }
+  std::cout << endl;
+  }*/
 
 struct Input_Parameters{
   int N; //number of valence neutrons
@@ -75,18 +85,13 @@ struct Many_Body_States{
 };
 
 struct Matrix_Elements{
+  char type; //j or m scheme
   vector<vector<int> > Braket; //list of 4 J-scheme states that make up TBME
   vector<int> J; //list of coupled angular momentum (2x)
   vector<int> T; //list of coupled isospin (2x)
   vector<double> OBME; //list of one-body matrix element values
   vector<double> TBME; //list of two-body matrix element values
 };
-
-/*struct M_Matrix_Elements{
-  vector<vector<int> > Braket; //list of 4 M-scheme states that make up TBME
-  vector<double> OBME; //list of one-body matrix element values
-  vector<double> TBME; //list of two-body matrix element values
-  };*/
 
 struct Hamiltonian{
   vector<vector<double> > Matrices; //list of vectors of length H_Split[i]^2 for each submatrix
@@ -614,13 +619,16 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
 			{ factor2 = 2.0; };
 		      factor3 = sqrt(factor1*factor2);
 		      
-		      braket[0] = m1 + 1; 
-		      braket[1] = n1 + 1;
-		      braket[2] = l1 + 1;
-		      braket[3] = k1 + 1;
-		      M_ME.Braket[ind] = braket;
-		      M_ME.TBME[ind] = factor3*tempmatel;
-		      ++ind;
+		      if(abs(factor3*tempmatel) > 0.00001)
+			{
+			  braket[0] = m1 + 1; 
+			  braket[1] = n1 + 1;
+			  braket[2] = l1 + 1;
+			  braket[3] = k1 + 1;
+			  M_ME.Braket[ind] = braket;
+			  M_ME.TBME[ind] = factor3*tempmatel;
+			  ++ind;
+			};
 		    };
 		};
 	    };
@@ -668,39 +676,32 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
 
 
 
-
-Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Space)
+Matrix_Elements Read_Matrix_Elements(string MEfile, Model_Space Space)
 {
   Matrix_Elements ME;
-  Matrix_Elements COM_ME;
 
-  std::cout << "Reading Matrix Elements" << endl;
-  std::cout << "-----------------------" << endl;
-
-  //Get Matrix Elements
   int NumElements;
   double OBME, TBME;
   int shell1, shell2, shell3, shell4, coupJ, coupT; // J-scheme interaction file contents
   ifstream interaction;	// interaction file
   string interactionline; // interaction file line
-  char type, comtype; // j or m scheme
   
-  string fullpath2 = PATH + Parameters.MatrixElements + ".int";
-  string fullpath3 = PATH + Parameters.MatrixElements + "_M.int";
+  string fullpath2 = PATH + MEfile + ".int";
+  string fullpath3 = PATH + MEfile + "_M.int";
   interaction.open(fullpath3.c_str()); // try m-scheme first
-  size_t intsize = Parameters.MatrixElements.size();
+  size_t intsize = MEfile.size();
 
   //open interaction file
   if (interaction.is_open())
-    { type = 'm'; }
-  else if (Parameters.MatrixElements[intsize-2] == '_' && Parameters.MatrixElements[intsize-1] == 'M')
-    { type = 'm'; interaction.open(fullpath2.c_str()); }
+    { ME.type = 'M'; }
+  else if (MEfile[intsize-2] == '_' && MEfile[intsize-1] == 'M')
+    { ME.type = 'M'; interaction.open(fullpath2.c_str()); }
   else
-    { type = 'j'; interaction.open(fullpath2.c_str()); }
+    { ME.type = 'J'; interaction.open(fullpath2.c_str()); }
 
   if (!interaction.is_open())
     {
-      cerr << "Matrix Element file does not exist" << endl; exit(1);
+      cerr << "Matrix Element file, " << MEfile << ", does not exist" << endl; exit(1);
     }
   
   //skip lines that start with '!'
@@ -718,7 +719,7 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
     }
 
   if(ME.OBME.size() != Space.shellsname.size())
-    { cerr << "Space/Interaction Mismatch" << endl; exit(1); }
+    { cerr << "Space/Interaction Mismatch with " << MEfile << endl; exit(1); }
 
   vector<int> braket(4);
   ME.Braket.resize(NumElements);
@@ -732,7 +733,7 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
   for(int i = 0; i < NumElements; ++i)
     {
       getline(interaction, interactionline);
-      if(type == 'j')
+      if(ME.type == 'J')
 	{ istringstream(interactionline) >> shell1 >> shell2 >> shell3 >> shell4 >> coupJ >> coupT >> TBME;
 	  if (shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2 && coupJ == tempJ && coupT == tempT)
 	    { --NumElements; --i; continue; };
@@ -761,7 +762,7 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
 	  ME.T[i] = coupT;
 	  ME.TBME[i] = TBME;
 	}
-      else if(type == 'm')
+      else if(ME.type == 'M')
 	{ istringstream(interactionline) >> shell1 >> shell2 >> shell3 >> shell4 >> TBME;
 	  if (shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2)
 	    { --NumElements; --i; continue; };
@@ -796,134 +797,36 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
   ME.T.resize(NumElements);
   ME.TBME.resize(NumElements);
 
-  //COM matrix elements
+  return ME;
+
+}
+
+
+
+Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Space)
+{
+  Matrix_Elements ME;
+  Matrix_Elements COM_ME;
+
+  std::cout << "Reading Matrix Elements" << endl;
+  std::cout << "-----------------------" << endl;
+
+  //Get Matrix Elements
+  ME = Read_Matrix_Elements(Parameters.MatrixElements, Space);
+
+  //Get COM matrix elements
   if(Parameters.COM == 1)
     {
-      fullpath2 = PATH + Parameters.COMMatrixElements + ".int";
-      fullpath3 = PATH + Parameters.COMMatrixElements + "_M.int";
-      interaction.open(fullpath3.c_str()); // try m-scheme first
-      intsize = Parameters.COMMatrixElements.size();
-      
-      //open interaction file
-      if (interaction.is_open())
-	{ comtype = 'm'; }
-      else if (Parameters.COMMatrixElements[intsize-2] == '_' && Parameters.COMMatrixElements[intsize-1] == 'M')
-	{ comtype = 'm'; interaction.open(fullpath2.c_str()); }
-      else
-	{ comtype = 'j'; interaction.open(fullpath2.c_str()); }
-      
-      if (!interaction.is_open())
-	{
-	  cerr << "COM Matrix Element file does not exist" << endl; exit(1);
-	}
-      
-      //skip lines that start with '!'
-      getline(interaction, interactionline);
-      while (interactionline[0] == '!'){ getline(interaction, interactionline); }
-      
-      //read matrix element parameters and one-body matrix elements
-      istringstream filestring(interactionline);
-      filestring >> NumElements;
-      
-      //get one-body matrix elements that correspond to the ordered proton/neutron shells
-      while (filestring >> OBME)
-	{
-	  COM_ME.OBME.push_back(OBME);
-	}
-      
-      if(ME.OBME.size() != Space.shellsname.size())
-	{ cerr << "Space/COM Interaction Mismatch" << endl; exit(1); }
-
-      vector<int> braket(4);
-      COM_ME.Braket.resize(NumElements);
-      for(int i = 0; i < NumElements; ++i){ COM_ME.Braket[i].resize(4); };
-      COM_ME.J.resize(NumElements);
-      COM_ME.T.resize(NumElements);
-      COM_ME.TBME.resize(NumElements);
-      
-      //read two-body parameters and two-body matrix elements
-      tempS1 = 0; tempS2 = 0; tempS3 = 0; tempS4 = 0; tempJ = -1; tempT = -1;
-      for(int i = 0; i < NumElements; ++i)
-	{
-	  getline(interaction, interactionline);
-	  if(comtype == 'j')
-	    { istringstream(interactionline) >> shell1 >> shell2 >> shell3 >> shell4 >> coupJ >> coupT >> TBME;
-	      if ((shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2 && coupJ == tempJ && coupT == tempT) || abs(TBME) < 0.000001)
-		{ --NumElements; --i; continue; };
-	      tempS1 = shell1; tempS2 = shell2; tempS3 = shell3; tempS4 = shell4; tempJ = coupJ; tempT = coupT;
-	      if(shell2 < shell1)
-		{
-		  swap(shell1, shell2);
-		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell1 - 1] + Space.shellsj[shell2 - 1] - coupJ - coupT));
-		}
-	      if(shell4 < shell3)
-		{
-		  swap(shell3, shell4);
-		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell3 - 1] + Space.shellsj[shell4 - 1] - coupJ - coupT));
-		}
-	      if((shell3 < shell1) || (shell3 == shell1 && shell4 < shell2))
-		{
-		  swap(shell1, shell3);
-		  swap(shell2, shell4);
-		}
-	      braket[0] = shell1;
-	      braket[1] = shell2;
-	      braket[2] = shell3;
-	      braket[3] = shell4;
-	      COM_ME.Braket[i] = braket;
-	      COM_ME.J[i] = coupJ;
-	      COM_ME.T[i] = coupT;
-	      COM_ME.TBME[i] = TBME;
-	    }
-	  else if(comtype == 'm')
-	    { istringstream(interactionline) >> shell1 >> shell2 >> shell3 >> shell4 >> TBME;
-	      if ((shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2) || abs(TBME) < 0.0001)
-		{ --NumElements; --i; continue; };
-	      tempS1 = shell1; tempS2 = shell2; tempS3 = shell3; tempS4 = shell4;
-	      if(shell2 < shell1)
-		{
-		  swap(shell1, shell2);
-		  TBME = TBME * -1.0;
-		}
-	      if(shell4 < shell3)
-		{
-		  swap(shell3, shell4);
-		  TBME = TBME * -1.0;
-		}
-	      if((shell3 < shell1) || (shell3 == shell1 && shell4 < shell2))
-		{
-		  swap(shell1, shell3);
-		  swap(shell2, shell4);
-		}
-	      braket[0] = shell1;
-	      braket[1] = shell2;
-	      braket[2] = shell3;
-	      braket[3] = shell4;
-	      COM_ME.Braket[i] = braket;
-	      COM_ME.TBME[i] = TBME;
-	    }
-	}
-      interaction.close();
-      
-      COM_ME.Braket.resize(NumElements);
-      COM_ME.J.resize(NumElements);
-      COM_ME.T.resize(NumElements);
-      COM_ME.TBME.resize(NumElements);
+      COM_ME = Read_Matrix_Elements(Parameters.COMMatrixElements, Space);
     }
 
   std::cout << "Number of One-Body Matrix Elements = " << ME.OBME.size() << endl;
-  if(type == 'j')
-    {std::cout << "Number of J-Scheme Two-Body Matrix Elements = " << ME.TBME.size() << endl << endl;}
-  else if(type == 'm')
-    {std::cout << "Number of M-Scheme Two-Body Matrix Elements = " << ME.TBME.size() << endl << endl;}
+  std::cout << "Number of " << ME.type << "-Scheme Two-Body Matrix Elements = " << ME.TBME.size() << endl << endl;
 
   if(Parameters.COM == 1)
     {
       std::cout << "Number of COM One-Body Matrix Elements = " << COM_ME.OBME.size() << endl;
-      if(comtype == 'j')
-	{std::cout << "Number of COM J-Scheme Two-Body Matrix Elements = " << COM_ME.TBME.size() << endl << endl;}
-      else if(comtype == 'm')
-	{std::cout << "Number of COM M-Scheme Two-Body Matrix Elements = " << COM_ME.TBME.size() << endl << endl;}
+      std::cout << "Number of COM " << COM_ME.type << "-Scheme Two-Body Matrix Elements = " << COM_ME.TBME.size() << endl << endl;
     }
 
 
@@ -942,13 +845,13 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
       };*/
 
 					  
-  if(type == 'j')
+  if(ME.type == 'J')
     { 
       ME = Convert_To_M_Matrix_Elements(Parameters.MatrixElements, Space, ME);
     }
   if(Parameters.COM == 1)
     {
-      if(comtype == 'j')
+      if(COM_ME.type == 'J')
 	{ 
 	  COM_ME = Convert_To_M_Matrix_Elements(Parameters.COMMatrixElements, Space, COM_ME);
 	}
@@ -966,22 +869,6 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
 		{ ME.TBME[i] += 50.0 * COM_ME.TBME[j]; break; }
 	    }
 	} 
-    }
-
-  int m1, n1, l1, k1, j1, t1, m2, n2, l2, k2, j2, t2;
-  for(int i = 0; i < int(ME.OBME.size()); ++i)
-    { ME.OBME[i] += 50.0 * COM_ME.OBME[i]; }
-  for(int i = 0; i < int(ME.TBME.size()); ++i)
-    {
-      m1 = ME.Braket[i][0], n1 = ME.Braket[i][1], l1 = ME.Braket[i][2], k1 = ME.Braket[i][3];
-      if(type == 'j'){ j1 = ME.J[i]; t1 = ME.T[i]; };
-      for(int j = 0; j < int(COM_ME.TBME.size()); ++j)
-	{
-	  m2 = COM_ME.Braket[j][0], n2 = COM_ME.Braket[j][1], l2 = COM_ME.Braket[j][2], k2 = COM_ME.Braket[j][3];
-	  if(comtype == 'j'){ j2 = COM_ME.J[j]; t2 = COM_ME.T[j]; };
-	  if((m1 == m2 && n1 == n2 && l1 == l2 && k1 == k2) && ((type == 'j' && comtype == 'j' && j1 == j2 && t1 == t2) || (type == 'm' && comtype == 'm')))
-	    { ME.TBME[i] += 50.0 * COM_ME.TBME[j]; break; }
-	}
     }
   
   return ME;
