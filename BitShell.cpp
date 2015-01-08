@@ -493,7 +493,7 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
 
   M_ME.OBME = J_ME.OBME;
 
-  for(int i = 0; i < int(J_ME.TBME.size()); ++i)
+  /*for(int i = 0; i < int(J_ME.TBME.size()); ++i)
     {
       int m3, n3, l3, k3, j3, t3;
       double tbme3;
@@ -505,7 +505,7 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
       t3 = J_ME.T[i];
       tbme3 = J_ME.TBME[i];
       std::cout << m3 << " " << n3 << " " << l3 << " " << k3 << "   " << j3 << " " << t3 << " " << tbme3 << endl;
-    };
+      };*/
 
   //Change J-Scheme matrix elements to M-Scheme
   int length1 = int(Space.levelsind.size());
@@ -601,11 +601,6 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
 				      double CGC2 = CGC(Space.levelsj[l1], Space.levelsm[l1], Space.levelsj[k1], Space.levelsm[k1], angmom3[b], angproj2);
 				      double CGC3 = CGC(0.5, Space.levelst[m1], 0.5, Space.levelst[n1], iso3[c], isoproj1);
 				      double CGC4 = CGC(0.5, Space.levelst[l1], 0.5, Space.levelst[k1], iso3[c], isoproj2);
-				      if(testint1 < 11)
-					{
-					  std::cout << endl << m1 + 1 << " " << n1 + 1 << " " << l1 + 1 << " " << k1 + 1 << " - ";
-					  std::cout << endl << ": " << m2 << " " << n2 << " " << l2 << " " << k2 << " - " << CGC1 << " " << CGC2 << " " << CGC3 << " " << CGC4 << " - " << J_ME.TBME[a] << " " << tbodyphase*CGC1*CGC2*CGC3*CGC4*J_ME.TBME[a];
-					}
 				      tempmatel = tempmatel + tbodyphase*CGC1*CGC2*CGC3*CGC4*J_ME.TBME[a];
 				    };
 				};
@@ -619,16 +614,13 @@ Matrix_Elements Convert_To_M_Matrix_Elements(string MatrixElements, Model_Space 
 			{ factor2 = 2.0; };
 		      factor3 = sqrt(factor1*factor2);
 		      
-		      if (abs(tempmatel) >= 0.0000001)
-			{
-			  braket[0] = m1 + 1; 
-			  braket[1] = n1 + 1;
-			  braket[2] = l1 + 1;
-			  braket[3] = k1 + 1;
-			  M_ME.Braket[ind] = braket;
-			  M_ME.TBME[ind] = factor3*tempmatel;
-			  ++ind;
-			};
+		      braket[0] = m1 + 1; 
+		      braket[1] = n1 + 1;
+		      braket[2] = l1 + 1;
+		      braket[3] = k1 + 1;
+		      M_ME.Braket[ind] = braket;
+		      M_ME.TBME[ind] = factor3*tempmatel;
+		      ++ind;
 		    };
 		};
 	    };
@@ -950,253 +942,51 @@ Matrix_Elements Get_Matrix_Elements(Input_Parameters Parameters, Model_Space Spa
       };*/
 
 					  
-  //add COM if both are same scheme
-  if(Parameters.COM == 1 && ((type == 'j' && comtype == 'j') || (type == 'm' && comtype == 'm')))
+  if(type == 'j')
+    { 
+      ME = Convert_To_M_Matrix_Elements(Parameters.MatrixElements, Space, ME);
+    }
+  if(Parameters.COM == 1)
     {
-      int m1, n1, l1, k1, j1, t1, m2, n2, l2, k2, j2, t2;
+      if(comtype == 'j')
+	{ 
+	  COM_ME = Convert_To_M_Matrix_Elements(Parameters.COMMatrixElements, Space, COM_ME);
+	}
+      //add COM
+      int m1, n1, l1, k1, m2, n2, l2, k2;
       for(int i = 0; i < int(ME.OBME.size()); ++i)
 	{ ME.OBME[i] += 50.0 * COM_ME.OBME[i]; }
       for(int i = 0; i < int(ME.TBME.size()); ++i)
 	{
 	  m1 = ME.Braket[i][0], n1 = ME.Braket[i][1], l1 = ME.Braket[i][2], k1 = ME.Braket[i][3];
-	  if(type == 'j'){ j1 = ME.J[i]; t1 = ME.T[i]; };
 	  for(int j = 0; j < int(COM_ME.TBME.size()); ++j)
 	    {
 	      m2 = COM_ME.Braket[j][0], n2 = COM_ME.Braket[j][1], l2 = COM_ME.Braket[j][2], k2 = COM_ME.Braket[j][3];
-	      if(comtype == 'j'){ j2 = COM_ME.J[j]; t2 = COM_ME.T[j]; };
-	      if((m1 == m2 && n1 == n2 && l1 == l2 && k1 == k2) && ((type == 'j' && comtype == 'j' && j1 == j2 && t1 == t2) || (type == 'm' && comtype == 'm')))
+	      if(m1 == m2 && n1 == n2 && l1 == l2 && k1 == k2)
 		{ ME.TBME[i] += 50.0 * COM_ME.TBME[j]; break; }
 	    }
-	}
-      if(type == 'j')
-	{
-	  /*ifstream testinteraction;	// interaction file
-	  string testinteractionline; // interaction file line
-	  string testpath = PATH + "o180.int";
-	  testinteraction.open(testpath.c_str());
-	  
-	  vector<double> testobme;
-	  vector<double> testtbme;
-	  double TBME, TBME1, TBME2;
-	  vector<int> testj;
-	  vector<int> testt;
-	  vector<vector<int> > testBraket;
-	  
-	  //skip lines that start with '!'
-	  getline(testinteraction, testinteractionline);
-	  while (testinteractionline[0] == '!'){ getline(testinteraction, testinteractionline); }
-	  
-	  //read matrix element parameters and one-body matrix elements
-	  istringstream testfilestring(testinteractionline);
-	  testfilestring >> NumElements;
-	  
-	  //get one-body matrix elements that correspond to the ordered proton/neutron shells
-	  while (testfilestring >> OBME)
-	    {
-	      testobme.push_back(OBME);
-	    }
-	  
-	  vector<int> testbraket(4);
-	  //read two-body parameters and two-body matrix elements
-	  tempS1 = 0, tempS2 = 0, tempS3 = 0, tempS4 = 0, tempJ = -1, tempT = -1;
-	  getline(testinteraction, testinteractionline);
-	  while(testinteractionline.size() != 0)
-	    {
-	      istringstream(testinteractionline) >> shell1 >> shell2 >> shell3 >> shell4 >> coupJ >> coupT >> TBME >> TBME1 >> TBME2;
-	      //std::cout << shell1 << " " << shell2 << " " << shell3 << " " << shell4 << endl;
-	      if (shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2 && coupJ == tempJ && coupT == tempT)
-		{ continue; };
-	      tempS1 = shell1; tempS2 = shell2; tempS3 = shell3; tempS4 = shell4; tempJ = coupJ; tempT = coupT;
-	      if(shell2 < shell1)
-		{
-		  swap(shell1, shell2);
-		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell1 - 1] + Space.shellsj[shell2 - 1] - coupJ - coupT));
-		}
-	      if(shell4 < shell3)
-		{
-		  swap(shell3, shell4);
-		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell3 - 1] + Space.shellsj[shell4 - 1] - coupJ - coupT));
-		}
-	      if((shell3 < shell1) || (shell3 == shell1 && shell4 < shell2))
-		{
-		  swap(shell1, shell3);
-		  swap(shell2, shell4);
-		}
-	      testbraket[0] = shell1;
-	      testbraket[1] = shell2;
-	      testbraket[2] = shell3;
-	      testbraket[3] = shell4;
-	      testBraket.push_back(testbraket);
-	      testj.push_back(coupJ);
-	      testt.push_back(coupT);
-	      testtbme.push_back(TBME);
-	      getline(testinteraction, testinteractionline);
-	    }
-	  testinteraction.close();
-	  
-	  ofstream myfile;
-	  int flag;
-	  myfile.open((PATH + "o180.error.txt").c_str());
-	  myfile << "TBME error file START" << endl;
-	  for(int i = 0; i < int(testtbme.size()); ++i)
-	    {
-	      int m11 = testBraket[i][0], n11 = testBraket[i][1], l11 = testBraket[i][2], k11 = testBraket[i][3], j11 = testj[i], t11 = testt[i];
-	      flag = 0;
-	      for(int j = 0; j < int(ME.TBME.size()); ++j)
-		{
-		  int m22 = ME.Braket[j][0], n22 = ME.Braket[j][1], l22 = ME.Braket[j][2], k22 = ME.Braket[j][3], j22 = ME.J[j], t22 = ME.T[j];
-		  if(j11 == j22 && t11 == t22 && (m11 == m22 && n11 == n22 && l11 == l22 && k11 == k22) && abs(testtbme[i]-ME.TBME[j]) >= 0.000001)
-		    {
-		      myfile << m11 << " " << n11 << " " << l11 << " " << k11 << " " << j11 << " " << t11 << " - " << m22 << " " << n22 << " " << l22 << " " << k22 << " " << j22 << " " << t22 << " - " << std::setprecision(10) << testtbme[i] << " " << std::setprecision(10) <<  ME.TBME[j] << " " << std::setprecision(10) << testtbme[i] - ME.TBME[j] << " " << j << endl;
-		      ME.TBME[j] = testtbme[i];
-		      flag = 1;
-		      break;
-		    }
-		  else if(j11 == j22 && t11 == t22 && (m11 == m22 && n11 == n22 && l11 == l22 && k11 == k22) && abs(testtbme[i]-ME.TBME[j]) < 0.000001)
-		    {
-		      flag = 1;
-		      break;
-		    }
-		}
-	      if(flag == 0)
-		{
-		  myfile << m11 << " " << n11 << " " << l11 << " " << k11 << " " << j11 << " " << t11 << " - " << std::setprecision(10) << testtbme[i] << endl;
-		};
- 	    }
- 	  myfile << "TBME error file END" << endl;
- 	  myfile.close();*/
-	  
- 	  Matrix_Elements ME2 = Convert_To_M_Matrix_Elements(Parameters.MatrixElements, Space, ME); ME = ME2;
- 	}
+	} 
     }
-  else
+
+  int m1, n1, l1, k1, j1, t1, m2, n2, l2, k2, j2, t2;
+  for(int i = 0; i < int(ME.OBME.size()); ++i)
+    { ME.OBME[i] += 50.0 * COM_ME.OBME[i]; }
+  for(int i = 0; i < int(ME.TBME.size()); ++i)
     {
-      if(type == 'j')
- 	{ 
- 	  /*ifstream testinteraction;	// interaction file
- 	  string testinteractionline; // interaction file line
- 	  string testpath = PATH + "o180.int";
- 	  testinteraction.open(testpath.c_str());
-	  
- 	  vector<double> testobme;
- 	  vector<double> testtbme;
- 	  double TBME, TBME1, TBME2;
- 	  vector<int> testj;
- 	  vector<int> testt;
- 	  vector<vector<int> > testBraket;
-	  
- 	  //skip lines that start with '!'
- 	  getline(testinteraction, testinteractionline);
- 	  while (testinteractionline[0] == '!'){ getline(testinteraction, testinteractionline); }
-	  
- 	  //read matrix element parameters and one-body matrix elements
- 	  istringstream testfilestring(testinteractionline);
- 	  testfilestring >> NumElements;
-	  
- 	  //get one-body matrix elements that correspond to the ordered proton/neutron shells
- 	  while (testfilestring >> OBME)
- 	    {
- 	      testobme.push_back(OBME);
- 	    }
-	  
- 	  vector<int> testbraket(4);
- 	  //read two-body parameters and two-body matrix elements
- 	  tempS1 = 0, tempS2 = 0, tempS3 = 0, tempS4 = 0, tempJ = -1, tempT = -1;
- 	  getline(testinteraction, testinteractionline);
- 	  while(testinteractionline.size() != 0)
- 	    {
- 	      istringstream(testinteractionline) >> shell1 >> shell2 >> shell3 >> shell4 >> coupJ >> coupT >> TBME >> TBME1 >> TBME2;
- 	      //std::cout << shell1 << " " << shell2 << " " << shell3 << " " << shell4 << endl;
- 	      if (shell1 == tempS3 && shell2 == tempS4 && shell3 == tempS1 && shell4 == tempS2 && coupJ == tempJ && coupT == tempT)
- 		{ continue; };
- 	      tempS1 = shell1; tempS2 = shell2; tempS3 = shell3; tempS4 = shell4; tempJ = coupJ; tempT = coupT;
- 	      if(shell2 < shell1)
- 		{
- 		  swap(shell1, shell2);
- 		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell1 - 1] + Space.shellsj[shell2 - 1] - coupJ - coupT));
- 		}
- 	      if(shell4 < shell3)
- 		{
- 		  swap(shell3, shell4);
- 		  TBME = TBME * pow(-1.0, int(Space.shellsj[shell3 - 1] + Space.shellsj[shell4 - 1] - coupJ - coupT));
- 		}
- 	      if((shell3 < shell1) || (shell3 == shell1 && shell4 < shell2))
- 		{
- 		  swap(shell1, shell3);
- 		  swap(shell2, shell4);
- 		}
- 	      testbraket[0] = shell1;
- 	      testbraket[1] = shell2;
- 	      testbraket[2] = shell3;
- 	      testbraket[3] = shell4;
- 	      testBraket.push_back(testbraket);
- 	      testj.push_back(coupJ);
- 	      testt.push_back(coupT);
- 	      testtbme.push_back(TBME);
- 	      getline(testinteraction, testinteractionline);
- 	    }
- 	  testinteraction.close();
-	  
- 	  ofstream myfile;
- 	  int flag;
- 	  myfile.open((PATH + "o180.error.txt").c_str());
- 	  myfile << "TBME error file START" << endl;
- 	  for(int i = 0; i < int(testtbme.size()); ++i)
- 	    {
- 	      int m11 = testBraket[i][0], n11 = testBraket[i][1], l11 = testBraket[i][2], k11 = testBraket[i][3], j11 = testj[i], t11 = testt[i];
- 	      flag = 0;
- 	      for(int j = 0; j < int(ME.TBME.size()); ++j)
- 		{
- 		  int m22 = ME.Braket[j][0], n22 = ME.Braket[j][1], l22 = ME.Braket[j][2], k22 = ME.Braket[j][3], j22 = ME.J[j], t22 = ME.T[j];
- 		  if(j11 == j22 && t11 == t22 && (m11 == m22 && n11 == n22 && l11 == l22 && k11 == k22) && abs(testtbme[i]-ME.TBME[j]) >= 0.000001)
- 		    {
- 		      myfile << m11 << " " << n11 << " " << l11 << " " << k11 << " " << j11 << " " << t11 << " - " << m22 << " " << n22 << " " << l22 << " " << k22 << " " << j22 << " " << t22 << " - " << std::setprecision(10) << testtbme[i] << " " << std::setprecision(10) <<  ME.TBME[j] << " " << std::setprecision(10) << testtbme[i] - ME.TBME[j] << " " << j << endl;
- 		      ME.TBME[j] = testtbme[i];
- 		      flag = 1;
- 		      break;
- 		    }
- 		  else if(j11 == j22 && t11 == t22 && (m11 == m22 && n11 == n22 && l11 == l22 && k11 == k22) && abs(testtbme[i]-ME.TBME[j]) < 0.000001)
- 		    {
- 		      flag = 1;
- 		      break;
- 		    }
- 		}
- 	      if(flag == 0)
- 		{
- 		  myfile << m11 << " " << n11 << " " << l11 << " " << k11 << " " << j11 << " " << t11 << " - " << std::setprecision(10) << testtbme[i] << endl;
- 		};
- 	    }
- 	  myfile << "TBME error file END" << endl;
- 	  myfile.close();*/
-	  
- 	  Matrix_Elements ME2 = Convert_To_M_Matrix_Elements(Parameters.MatrixElements, Space, ME);
- 	  ME = ME2;
- 	}
-       if(Parameters.COM == 1 && comtype == 'j')
- 	{ Matrix_Elements COM_ME2 = Convert_To_M_Matrix_Elements(Parameters.COMMatrixElements, Space, COM_ME); COM_ME = COM_ME2; }
+      m1 = ME.Braket[i][0], n1 = ME.Braket[i][1], l1 = ME.Braket[i][2], k1 = ME.Braket[i][3];
+      if(type == 'j'){ j1 = ME.J[i]; t1 = ME.T[i]; };
+      for(int j = 0; j < int(COM_ME.TBME.size()); ++j)
+	{
+	  m2 = COM_ME.Braket[j][0], n2 = COM_ME.Braket[j][1], l2 = COM_ME.Braket[j][2], k2 = COM_ME.Braket[j][3];
+	  if(comtype == 'j'){ j2 = COM_ME.J[j]; t2 = COM_ME.T[j]; };
+	  if((m1 == m2 && n1 == n2 && l1 == l2 && k1 == k2) && ((type == 'j' && comtype == 'j' && j1 == j2 && t1 == t2) || (type == 'm' && comtype == 'm')))
+	    { ME.TBME[i] += 50.0 * COM_ME.TBME[j]; break; }
+	}
+    }
+  
+  return ME;
 
-       //add COM
-       if(Parameters.COM == 1)
- 	{
- 	  int m1, n1, l1, k1, m2, n2, l2, k2;
- 	  for(int i = 0; i < int(ME.OBME.size()); ++i)
- 	    { ME.OBME[i] += 50.0 * COM_ME.OBME[i]; }
- 	  for(int i = 0; i < int(ME.TBME.size()); ++i)
- 	    {
- 	      m1 = ME.Braket[i][0], n1 = ME.Braket[i][1], l1 = ME.Braket[i][2], k1 = ME.Braket[i][3];
- 	      for(int j = 0; j < int(COM_ME.TBME.size()); ++j)
- 		{
- 		  m2 = COM_ME.Braket[j][0], n2 = COM_ME.Braket[j][1], l2 = COM_ME.Braket[j][2], k2 = COM_ME.Braket[j][3];
- 		  if(m1 == m2 && n1 == n2 && l1 == l2 && k1 == k2)
- 		    { ME.TBME[i] += 50.0 * COM_ME.TBME[j]; break; }
- 		}
- 	    }
- 	}
-     }
-
-   return ME;
-
- };
+};
 
 
 
